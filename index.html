@@ -120,12 +120,12 @@
     </button>
 
     <div class="mt-8 text-xs text-neutral-400 space-y-1">
-      <p><strong>Sip</strong> — take a sip</p>
+      <p><strong>Sip</strong> — most common, take a sip</p>
       <p><strong>Safe</strong> — pass the dice</p>
       <p><strong>Next person</strong> — they sip</p>
-      <p><strong>7</strong> — speak in a new accent until next roll</p>
-      <p><strong>Double 5</strong> — chook motor boat</p>
+      <p><strong>7</strong> — new accent until next roll</p>
       <p><strong>Doubles</strong> — random fun side quest</p>
+      <p><strong>Double 5</strong> — chook motor boat</p>
     </div>
   </div>
 
@@ -181,9 +181,11 @@ const funQuests = [
   { name: 'Rhyme', text: 'speak only in rhyme until next roll' },
   { name: 'Whisper', text: 'whisper everything until next roll' },
   { name: 'No hands', text: 'no using hands until next roll' },
-  { name: 'Compliment', text: 'compliment everyone before you can drink' },
-  { name: 'Stand up', text: 'stand up for the rest of the round' },
-  { name: 'Accent swap', text: 'swap accents with the person next to you' }
+  { name: 'Compliment', text: 'give a genuine compliment to someone before you drink' },
+  { name: 'Stand up', text: 'stand up for the rest of this round' },
+  { name: 'Pirate', text: 'talk like a pirate until next roll' },
+  { name: 'Slow mo', text: 'do everything in slow motion until next roll' },
+  { name: 'Question', text: 'only speak in questions until next roll' }
 ];
 
 let players = [];
@@ -275,10 +277,25 @@ function renderDie(el, value) {
 
 function getOutcome(a, b) {
   const total = a + b;
+  const doubles = a === b;
+
+  // Double 5 = chook (rare fun)
   if (a === 5 && b === 5) return 'chook';
+
+  // Total 7 = accent (about 17%)
   if (total === 7) return 'accent';
-  if (a === b) return 'quest'; // any other doubles
-  return outcomeMap[`${a}-${b}`] || 'sip';
+
+  // Other doubles = fun quest (about 14%)
+  if (doubles) return 'quest';
+
+  // Next person sips (~20%)
+  if (['1-6','6-1','2-6','6-2','3-6','6-3','4-6'].includes(`${a}-${b}`)) return 'next';
+
+  // Safe (~17%)
+  if (['1-2','2-1','1-3','3-1','2-3','3-2','1-4','4-1'].includes(`${a}-${b}`)) return 'safe';
+
+  // Everything else = sip (~32% remaining, feels frequent but not dominant)
+  return 'sip';
 }
 
 function nextDrinker(fromIndex) {
