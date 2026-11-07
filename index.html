@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bin Chicken">
+<meta name="theme-color" content="#111111">
+<title>Bin Chicken</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #f7f5f2;
+    color: #111;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  
+  .die {
+    width: 100px;
+    height: 100px;
+    background: white;
+    border: 3px solid #111;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 4px 0 #111, 0 6px 16px rgba(0,0,0,0.08);
+  }
+  
+  .die.rolling {
+    animation: shake 0.3s ease-in-out infinite;
+  }
+  
+  @keyframes shake {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-12deg); }
+    50% { transform: rotate(10deg); }
+    75% { transform: rotate(-6deg); }
+  }
+  
+  .dots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    width: 70%;
+    height: 70%;
+  }
+  
+  .dot {
+    width: 16px;
+    height: 16px;
+    background: #111;
+    border-radius: 50%;
+    justify-self: center;
+    align-self: center;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.12s;
+  }
+  
+  .dot.on { opacity: 1; transform: scale(1); }
+  
+  .action-pop {
+    animation: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  
+  @keyframes pop {
+    0% { opacity: 0; transform: scale(0.85); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  
+  .player-pill {
+    transition: all 0.2s;
+  }
+  
+  .player-pill.active {
+    background: #111;
+    color: white;
+    border-color: #111;
+  }
+  
+  .screen { display: none; }
+  .screen.active { display: block; }
+</style>
+</head>
+<body class="min-h-screen">
+
+  <!-- SETUP SCREEN -->
+  <div id="setupScreen" class="screen active px-5 py-8 max-w-md mx-auto">
+    <header class="text-center mb-8">
+      <h1 class="text-4xl font-bold tracking-tight">Bin Chicken</h1>
+      <p class="text-neutral-500 mt-1">Skull & Dice</p>
+    </header>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200 mb-6">
+      <h2 class="font-semibold mb-3">Players</h2>
+      <div id="playerList" class="space-y-2 mb-4"></div>
+      <div class="flex gap-2">
+        <input id="newPlayerName" type="text" placeholder="Add name" class="flex-1 border border-neutral-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-black">
+        <button id="addPlayerBtn" class="bg-black text-white px-5 py-3 rounded-xl text-sm font-medium">Add</button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200 mb-6">
+      <h2 class="font-semibold mb-3">Non-drinker</h2>
+      <p class="text-sm text-neutral-500 mb-3">They never drink. Effects that hit them pass to the next drinker.</p>
+      <select id="nonDrinkerSelect" class="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm outline-none">
+        <option value="">None</option>
+      </select>
+    </div>
+
+    <button id="startGameBtn" class="w-full bg-black text-white py-4 rounded-2xl text-lg font-semibold shadow-lg active:scale-95 transition-transform">
+      Start Game
+    </button>
+
+    <div class="mt-8 text-xs text-neutral-400 space-y-1">
+      <p><strong>Sip</strong> — take a sip</p>
+      <p><strong>Safe</strong> — pass the dice</p>
+      <p><strong>Next person</strong> — they sip</p>
+      <p><strong>7</strong> — speak in a new accent until next roll</p>
+      <p><strong>Double 5</strong> — chook motor boat</p>
+      <p><strong>Doubles</strong> — random fun side quest</p>
+    </div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="gameScreen" class="screen px-5 py-6 max-w-md mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <button id="backToSetup" class="text-sm text-neutral-400">← Setup</button>
+      <div class="text-xs text-neutral-400">Bin Chicken</div>
+    </div>
+
+    <div id="accentBanner" class="hidden text-center text-sm font-medium text-purple-700 bg-purple-50 rounded-xl py-2 px-4 mb-4 mx-auto max-w-xs"></div>
+
+    <div class="flex justify-center gap-6 mb-8">
+      <div id="die1" class="die"></div>
+      <div id="die2" class="die"></div>
+    </div>
+
+    <div class="text-center mb-6">
+      <div id="total" class="text-5xl font-bold tabular-nums leading-none">—</div>
+    </div>
+
+    <div id="actionArea" class="text-center min-h-[90px] mb-6">
+      <div id="actionText" class="text-3xl font-bold text-neutral-300">Roll</div>
+      <div id="actionSub" class="text-sm text-neutral-500 mt-1"></div>
+    </div>
+
+    <button id="rollBtn" class="w-full bg-black text-white py-4 rounded-2xl text-lg font-semibold shadow-xl active:scale-95 transition-transform mb-4">
+      Roll Dice
+    </button>
+
+    <div id="playerListGame" class="mt-6 space-y-1.5"></div>
+  </div>
+
+<script>
+const positions = {
+  1: [4], 2: [0,8], 3: [0,4,8], 4: [0,2,6,8], 5: [0,2,4,6,8], 6: [0,2,3,5,6,8]
+};
+
+const outcomeMap = {
+  '1-6':'next','6-1':'next','2-6':'next','6-2':'next','3-6':'next','6-3':'next','4-6':'next',
+  '1-2':'safe','2-1':'safe','1-3':'safe','3-1':'safe','2-3':'safe','3-2':'safe','1-4':'safe'
+};
+
+const accents = [
+  'Scottish', 'Irish', 'Australian', 'Southern American', 'British RP',
+  'French', 'German', 'Russian', 'Indian', 'Italian', 'Spanish',
+  'Kiwi', 'Canadian', 'Texan', 'Boston', 'Jamaican', 'South African',
+  'Pirate', 'Robot', 'Valley Girl', 'Old English'
+];
+
+const funQuests = [
+  { name: 'Animal', text: 'act like a random animal until next roll' },
+  { name: 'Rhyme', text: 'speak only in rhyme until next roll' },
+  { name: 'Whisper', text: 'whisper everything until next roll' },
+  { name: 'No hands', text: 'no using hands until next roll' },
+  { name: 'Compliment', text: 'compliment everyone before you can drink' },
+  { name: 'Stand up', text: 'stand up for the rest of the round' },
+  { name: 'Accent swap', text: 'swap accents with the person next to you' }
+];
+
+let players = [];
+let nonDrinkerIndex = -1;
+let currentIndex = 0;
+let playerAccents = {}; // index -> accent string, lasts until their next roll
+
+function getRandomAccent() {
+  return accents[Math.floor(Math.random() * accents.length)];
+}
+
+const setupScreen = document.getElementById('setupScreen');
+const gameScreen = document.getElementById('gameScreen');
+const playerListEl = document.getElementById('playerList');
+const newPlayerName = document.getElementById('newPlayerName');
+const addPlayerBtn = document.getElementById('addPlayerBtn');
+const nonDrinkerSelect = document.getElementById('nonDrinkerSelect');
+const startGameBtn = document.getElementById('startGameBtn');
+const backToSetup = document.getElementById('backToSetup');
+const currentPlayerName = document.getElementById('currentPlayerName');
+const die1 = document.getElementById('die1');
+const die2 = document.getElementById('die2');
+const totalEl = document.getElementById('total');
+const actionText = document.getElementById('actionText');
+const actionSub = document.getElementById('actionSub');
+const rollBtn = document.getElementById('rollBtn');
+const playerListGame = document.getElementById('playerListGame');
+const accentBanner = document.getElementById('accentBanner');
+
+function renderPlayerList() {
+  playerListEl.innerHTML = players.map((p, i) => `
+    <div class="flex items-center justify-between py-2 px-3 bg-neutral-50 rounded-xl">
+      <span class="font-medium">${p}</span>
+      <button onclick="removePlayer(${i})" class="text-neutral-400 text-sm">×</button>
+    </div>
+  `).join('');
+  
+  nonDrinkerSelect.innerHTML = '<option value="">None</option>' + 
+    players.map((p, i) => `<option value="${i}">${p}</option>`).join('');
+}
+
+function addPlayer() {
+  const name = newPlayerName.value.trim();
+  if (!name) return;
+  players.push(name);
+  newPlayerName.value = '';
+  renderPlayerList();
+}
+
+function removePlayer(i) {
+  players.splice(i, 1);
+  renderPlayerList();
+}
+
+window.removePlayer = removePlayer;
+
+addPlayerBtn.addEventListener('click', addPlayer);
+newPlayerName.addEventListener('keypress', e => { if (e.key === 'Enter') addPlayer(); });
+
+startGameBtn.addEventListener('click', () => {
+  if (players.length < 2) {
+    alert('Add at least 2 players');
+    return;
+  }
+  nonDrinkerIndex = nonDrinkerSelect.value === '' ? -1 : parseInt(nonDrinkerSelect.value);
+  currentIndex = 0;
+  setupScreen.classList.remove('active');
+  gameScreen.classList.add('active');
+  updateGameUI();
+  renderDie(die1, 1);
+  renderDie(die2, 1);
+});
+
+backToSetup.addEventListener('click', () => {
+  gameScreen.classList.remove('active');
+  setupScreen.classList.add('active');
+});
+
+function renderDie(el, value) {
+  el.innerHTML = '<div class="dots"></div>';
+  const dots = el.querySelector('.dots');
+  for (let i = 0; i < 9; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    if (positions[value].includes(i)) d.classList.add('on');
+    dots.appendChild(d);
+  }
+}
+
+function getOutcome(a, b) {
+  const total = a + b;
+  if (a === 5 && b === 5) return 'chook';
+  if (total === 7) return 'accent';
+  if (a === b) return 'quest'; // any other doubles
+  return outcomeMap[`${a}-${b}`] || 'sip';
+}
+
+function nextDrinker(fromIndex) {
+  let i = (fromIndex + 1) % players.length;
+  while (i !== fromIndex && i === nonDrinkerIndex) {
+    i = (i + 1) % players.length;
+  }
+  return i;
+}
+
+function getDisplay(outcome, rollerIndex) {
+  const roller = players[rollerIndex];
+  switch (outcome) {
+    case 'sip':
+      return { main: 'Sip', sub: `${roller} takes a sip`, color: 'text-amber-700', advance: true };
+    case 'safe':
+      return { main: 'Safe', sub: 'Pass the dice', color: 'text-neutral-500', advance: true };
+    case 'next': {
+      const target = nextDrinker(rollerIndex);
+      const targetName = players[target];
+      return { main: 'Next person', sub: `${targetName} sips`, color: 'text-orange-600', advance: true };
+    }
+    case 'accent': {
+      const accent = accents[Math.floor(Math.random() * accents.length)];
+      playerAccents[rollerIndex] = accent;
+      return { main: 'Accent!', sub: `${roller} speaks in a ${accent} accent until next roll`, color: 'text-purple-700', advance: true };
+    }
+    case 'chook':
+      return { main: 'CHOOK', sub: `${roller} does the chook motor boat!`, color: 'text-pink-600', advance: true };
+    case 'quest': {
+      const quest = funQuests[Math.floor(Math.random() * funQuests.length)];
+      return { main: quest.name, sub: `${roller} must ${quest.text}`, color: 'text-teal-600', advance: true };
+    }
+    default:
+      return { main: 'Sip', sub: `${roller} takes a sip`, color: 'text-amber-700', advance: true };
+  }
+}
+
+function updateGameUI() {
+  const name = players[currentIndex];
+  currentPlayerName.textContent = name;
+  
+  // Show active accent if this player has one
+  if (playerAccents[currentIndex]) {
+    accentBanner.textContent = `Speaking in a ${playerAccents[currentIndex]} accent`;
+    accentBanner.classList.remove('hidden');
+  } else {
+    accentBanner.classList.add('hidden');
+  }
+
+  playerListGame.innerHTML = players.map((p, i) => `
+    <div class="flex items-center justify-between py-2 px-3 rounded-xl text-sm ${i === currentIndex ? 'bg-black text-white' : 'bg-white border border-neutral-100'}">
+      <span class="font-medium">${p}${i === nonDrinkerIndex ? ' (dry)' : ''}</span>
+      <span class="text-xs opacity-70">${playerAccents[i] ? playerAccents[i] + ' accent' : ''}</span>
+    </div>
+  `).join('');
+}
+
+function roll() {
+  if (rollBtn.disabled) return;
+  rollBtn.disabled = true;
+  actionText.textContent = 'Rolling…';
+  actionText.className = 'text-3xl font-bold text-neutral-300';
+  actionSub.textContent = '';
+
+  die1.classList.add('rolling');
+  die2.classList.add('rolling');
+
+  let f = 0;
+  const flicker = setInterval(() => {
+    renderDie(die1, Math.floor(Math.random()*6)+1);
+    renderDie(die2, Math.floor(Math.random()*6)+1);
+    if (++f > 5) clearInterval(flicker);
+  }, 55);
+
+  setTimeout(() => {
+    clearInterval(flicker);
+    const v1 = Math.floor(Math.random()*6)+1;
+    const v2 = Math.floor(Math.random()*6)+1;
+
+    die1.classList.remove('rolling');
+    die2.classList.remove('rolling');
+    renderDie(die1, v1);
+    renderDie(die2, v2);
+
+    const total = v1 + v2;
+    totalEl.textContent = total;
+
+    // Clear accent on their next roll (it lasts until this roll)
+    if (playerAccents[currentIndex]) {
+      delete playerAccents[currentIndex];
+    }
+
+    const outcome = getOutcome(v1, v2);
+    const display = getDisplay(outcome, currentIndex);
+
+    actionText.textContent = display.main;
+    actionText.className = `text-3xl font-bold ${display.color} action-pop`;
+    actionSub.textContent = display.sub;
+
+    if (display.advance) {
+      currentIndex = (currentIndex + 1) % players.length;
+      // skip non-drinker if they would be next and the effect was on them? keep simple
+      if (players[currentIndex] && currentIndex === nonDrinkerIndex) {
+        currentIndex = (currentIndex + 1) % players.length;
+      }
+    }
+
+    setTimeout(() => updateGameUI(), 600);
+    rollBtn.disabled = false;
+  }, 480);
+}
+
+rollBtn.addEventListener('click', roll);
+
+// Shake
+let last = 0;
+window.addEventListener('devicemotion', e => {
+  const a = e.accelerationIncludingGravity;
+  if (!a) return;
+  const mag = Math.abs(a.x)+Math.abs(a.y)+Math.abs(a.z);
+  if (mag > 30 && Date.now()-last > 1200 && !rollBtn.disabled && gameScreen.classList.contains('active')) {
+    last = Date.now();
+    roll();
+  }
+});
+
+// Default players for quick start
+players = ['Player 1','Player 2','Player 3','Player 4','Player 5','Player 6','Player 7','Player 8','Player 9','Player 10'];
+renderPlayerList();
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
