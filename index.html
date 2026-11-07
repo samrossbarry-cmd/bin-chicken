@@ -92,37 +92,69 @@
   .screen { display: none; }
   .screen.active { display: block; }
 
-  /* Landscape / iPad / TV casting */
+  /* Landscape / iPad / TV casting — wide horizontal layout */
   @media (orientation: landscape), (min-width: 768px) {
     body { background: #f7f5f2; }
     #gameScreen {
       max-width: 100%;
-      padding: 2rem 4rem;
-      display: flex;
-      flex-direction: column;
+      padding: 1.5rem 2.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      grid-template-areas:
+        "header header"
+        "dice action"
+        "button button";
+      gap: 1.25rem 2rem;
       align-items: center;
-      justify-content: center;
       min-height: 100vh;
       min-height: 100dvh;
     }
-    .die {
-      width: 160px;
-      height: 160px;
-      border-width: 4px;
-      border-radius: 24px;
+    #gameScreen > .flex.items-center.justify-between { grid-area: header; }
+    #gameScreen > .text-center:first-of-type,
+    #gameScreen > #accentBanner { grid-area: header; }
+    #gameScreen .flex.justify-center.gap-6 { 
+      grid-area: dice; 
+      justify-self: center;
+      gap: 2.5rem;
     }
-    .dot { width: 22px; height: 22px; }
-    #currentPlayerName { font-size: 3.5rem !important; }
-    #total { font-size: 7rem !important; }
-    #actionText { font-size: 4rem !important; }
-    #actionSub { font-size: 1.4rem !important; max-width: 800px; margin-left: auto; margin-right: auto; }
-    .flex.justify-center.gap-6 { gap: 3rem; }
+    #gameScreen > .text-center:nth-of-type(2) { grid-area: dice; justify-self: center; margin-top: -0.5rem; }
+    #actionArea { 
+      grid-area: action; 
+      justify-self: center;
+      text-align: center;
+      max-width: 90%;
+    }
+    #rollBtn { 
+      grid-area: button; 
+      max-width: 420px; 
+      margin: 0 auto;
+      justify-self: center;
+    }
+    .die {
+      width: 150px;
+      height: 150px;
+      border-width: 4px;
+      border-radius: 22px;
+    }
+    .dot { width: 20px; height: 20px; }
+    #currentPlayerName { font-size: 3.2rem !important; }
+    #total { font-size: 6.5rem !important; }
+    #actionText { font-size: 3.6rem !important; line-height: 1.05; }
+    #actionSub { font-size: 1.35rem !important; max-width: 640px; margin: 0.5rem auto 0; line-height: 1.4; }
+    #accentBanner { max-width: 480px; font-size: 1rem; }
   }
   @media (min-width: 1024px) {
-    .die { width: 200px; height: 200px; }
-    #currentPlayerName { font-size: 4.5rem !important; }
-    #total { font-size: 9rem !important; }
-    #actionText { font-size: 5rem !important; }
+    .die { width: 180px; height: 180px; }
+    #currentPlayerName { font-size: 4rem !important; }
+    #total { font-size: 8rem !important; }
+    #actionText { font-size: 4.5rem !important; }
+    #actionSub { font-size: 1.5rem !important; }
+  }
+  @media (min-width: 1400px) {
+    .die { width: 220px; height: 220px; }
+    #currentPlayerName { font-size: 5rem !important; }
+    #total { font-size: 10rem !important; }
+    #actionText { font-size: 5.5rem !important; }
   }
 
 </style>
@@ -434,6 +466,30 @@ const nameDropLines = [
   "and I once fingered a bin chicken while it was eating a dead rat",
   "and I got a bin chicken to lay an egg in my mouth at a party",
   "and I once had sex with a bin chicken in the back of a truck",
+  "and I once got caught shagging a pool noodle",
+  "and my mum still thinks I'm a virgin",
+  "and I named my vibrator after my ex",
+  "and I once proposed to a traffic cone",
+  "and I have a secret OnlyFans for my feet",
+  "and I once fingered a pumpkin for science",
+  "and I got food poisoning from eating a raw sausage",
+  "and I once made out with a mirror for practice",
+  "and I regularly roleplay as a traffic warden during sex",
+  "and I once got a seagull to sit on my face",
+  "and I have a collection of used underwear",
+  "and I once shagged a watermelon",
+  "and I named my first car after my favourite sex position",
+  "and I once got arrested for public indecency with a garden gnome",
+  "and I keep a dildo in my glovebox for emergencies",
+  "and I once licked a stranger's armpit for $50",
+  "and I have a secret fetish for vacuum cleaners",
+  "and I once did the motorboat on a blow-up doll in public",
+  "and I regularly dream about my high school teacher",
+  "and I once got a koala to peck my nipples",
+  "and I have a body pillow of my own face",
+  "and I once proposed to a bin at the tip (ironically)",
+  "and I once got caught masturbating to the weather forecast",
+  "and I named my dog after a sex position",
 ];
 
 let usedNameDrops = new Set();
