@@ -228,10 +228,11 @@ function renderPlayerList() {
 }
 
 function addPlayer() {
-  const name = newPlayerName.value.trim();
+  const input = document.getElementById('newPlayerName');
+  const name = (input ? input.value : '').trim();
   if (!name) return;
   players.push(name);
-  newPlayerName.value = '';
+  if (input) input.value = '';
   renderPlayerList();
 }
 
@@ -239,11 +240,23 @@ function removePlayer(i) {
   players.splice(i, 1);
   renderPlayerList();
 }
-
 window.removePlayer = removePlayer;
 
-addPlayerBtn.addEventListener('click', addPlayer);
-newPlayerName.addEventListener('keypress', e => { if (e.key === 'Enter') addPlayer(); });
+// Attach listeners after DOM is ready
+function setupListeners() {
+  const addBtn = document.getElementById('addPlayerBtn');
+  const nameInput = document.getElementById('newPlayerName');
+  if (addBtn) addBtn.addEventListener('click', addPlayer);
+  if (nameInput) {
+    nameInput.addEventListener('keypress', e => { if (e.key === 'Enter') addPlayer(); });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupListeners);
+} else {
+  setupListeners();
+}
 
 startGameBtn.addEventListener('click', () => {
   if (players.length < 2) {
