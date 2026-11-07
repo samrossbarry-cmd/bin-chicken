@@ -1,1 +1,719 @@
-PLACEHOLDER_FOR_FULL_CONTENT
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bin Chicken">
+<meta name="theme-color" content="#111111">
+<title>Bin Chicken</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #f7f5f2;
+    color: #111;
+    min-height: 100vh;
+    min-height: 100dvh;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  .die {
+    width: 100px;
+    height: 100px;
+    background: white;
+    border: 3px solid #111;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 4px 0 #111, 0 6px 16px rgba(0,0,0,0.08);
+  }
+  
+  .die.rolling {
+    animation: shake 0.3s ease-in-out infinite;
+  }
+  
+  @keyframes shake {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-12deg); }
+    50% { transform: rotate(10deg); }
+    75% { transform: rotate(-6deg); }
+  }
+  
+  .dots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    width: 70%;
+    height: 70%;
+  }
+  
+  .dot {
+    width: 16px;
+    height: 16px;
+    background: #111;
+    border-radius: 50%;
+    justify-self: center;
+    align-self: center;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.12s;
+  }
+  
+  .dot.on { opacity: 1; transform: scale(1); }
+  
+  .action-pop {
+    animation: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  
+  @keyframes pop {
+    0% { opacity: 0; transform: scale(0.85); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  
+  .player-pill {
+    transition: all 0.2s;
+  }
+  
+  .player-pill.active {
+    background: #111;
+    color: white;
+    border-color: #111;
+  }
+  
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* Landscape / iPad / TV casting */
+  @media (orientation: landscape), (min-width: 768px) {
+    body { background: #f7f5f2; }
+    #gameScreen {
+      max-width: 100%;
+      padding: 2rem 4rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+    .die {
+      width: 160px;
+      height: 160px;
+      border-width: 4px;
+      border-radius: 24px;
+    }
+    .dot { width: 22px; height: 22px; }
+    #currentPlayerName { font-size: 3.5rem !important; }
+    #total { font-size: 7rem !important; }
+    #actionText { font-size: 4rem !important; }
+    #actionSub { font-size: 1.4rem !important; max-width: 800px; margin-left: auto; margin-right: auto; }
+    .flex.justify-center.gap-6 { gap: 3rem; }
+  }
+  @media (min-width: 1024px) {
+    .die { width: 200px; height: 200px; }
+    #currentPlayerName { font-size: 4.5rem !important; }
+    #total { font-size: 9rem !important; }
+    #actionText { font-size: 5rem !important; }
+  }
+
+</style>
+</head>
+<body class="min-h-screen">
+
+  <!-- SETUP SCREEN -->
+  <div id="setupScreen" class="screen active px-5 py-8 max-w-md mx-auto">
+    <header class="text-center mb-8">
+      <h1 class="text-4xl font-bold tracking-tight">Bin Chicken</h1>
+      <p class="text-neutral-500 mt-1">Skull & Dice</p>
+    </header>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200 mb-6">
+      <h2 class="font-semibold mb-3">Players</h2>
+      <div id="playerList" class="space-y-2 mb-4"></div>
+      <div class="flex gap-2">
+        <input id="newPlayerName" type="text" placeholder="Add name" class="flex-1 border border-neutral-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-black">
+        <button id="addPlayerBtn" class="bg-black text-white px-5 py-3 rounded-xl text-sm font-medium">Add</button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200 mb-6">
+      <h2 class="font-semibold mb-3">Non-drinker</h2>
+      <p class="text-sm text-neutral-500 mb-3">They never drink. Effects that hit them pass to the next drinker.</p>
+      <select id="nonDrinkerSelect" class="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm outline-none">
+        <option value="">None</option>
+      </select>
+    </div>
+
+    <button id="startGameBtn" class="w-full bg-black text-white py-4 rounded-2xl text-lg font-semibold shadow-lg active:scale-95 transition-transform">
+      Start Game
+    </button>
+
+    <div class="mt-8 text-xs text-neutral-400 space-y-1">
+      <p><strong>Sip</strong> — most common, take a sip</p>
+      <p><strong>Safe</strong> — pass the dice</p>
+      <p><strong>Next person</strong> — they sip</p>
+      <p><strong>7</strong> — new accent until next roll</p>
+      <p><strong>Doubles</strong> — random fun side quest</p>
+      <p><strong>Chook motor boat</strong> — ~10%</p>
+    </div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="gameScreen" class="screen px-5 py-6 max-w-md mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <button id="backToSetup" class="text-sm text-neutral-400">← Setup</button>
+      <div class="text-xs text-neutral-400">Bin Chicken</div>
+    </div>
+
+    <div id="accentBanner" class="hidden text-center text-sm font-medium text-purple-700 bg-purple-50 rounded-xl py-2 px-4 mb-4 mx-auto max-w-xs"></div>
+
+    <div class="text-center mb-6">
+      <div class="text-xs uppercase tracking-wider text-neutral-400 mb-1">Current player</div>
+      <div id="currentPlayerName" class="text-2xl font-bold">—</div>
+    </div>
+
+    <div class="flex justify-center gap-6 mb-8">
+      <div id="die1" class="die"></div>
+      <div id="die2" class="die"></div>
+    </div>
+
+    <div class="text-center mb-6">
+      <div id="total" class="text-5xl font-bold tabular-nums leading-none">—</div>
+    </div>
+
+    <div id="actionArea" class="text-center min-h-[90px] mb-6">
+      <div id="actionText" class="text-3xl font-bold text-neutral-300">Roll</div>
+      <div id="actionSub" class="text-sm text-neutral-500 mt-1"></div>
+    </div>
+
+    <button id="rollBtn" class="w-full bg-black text-white py-4 rounded-2xl text-lg font-semibold shadow-xl active:scale-95 transition-transform mb-4">
+      Roll Dice
+    </button>
+
+    <div id="playerListGame" class="hidden"></div>
+  </div>
+
+<script>
+const positions = {
+  1: [4], 2: [0,8], 3: [0,4,8], 4: [0,2,6,8], 5: [0,2,4,6,8], 6: [0,2,3,5,6,8]
+};
+
+const outcomeMap = {
+  '1-6':'next','6-1':'next','2-6':'next','6-2':'next','3-6':'next','6-3':'next','4-6':'next',
+  '1-2':'safe','2-1':'safe','1-3':'safe','3-1':'safe','2-3':'safe','3-2':'safe','1-4':'safe'
+};
+
+const accents = [
+  'Scottish', 'Irish', 'Australian', 'Southern American', 'British RP',
+  'French', 'German', 'Russian', 'Indian', 'Italian', 'Spanish',
+  'Kiwi', 'Canadian', 'Texan', 'Boston', 'Jamaican', 'South African',
+  'Pirate', 'Robot', 'Valley Girl', 'Old English'
+];
+
+const funQuests = [
+  { name: 'Animal', text: 'act like a random animal until next roll' },
+  { name: 'Rhyme', text: 'speak only in rhyme until next roll' },
+  { name: 'Whisper', text: 'whisper everything until next roll' },
+  { name: 'No hands', text: 'no using hands until next roll' },
+  { name: 'Compliment', text: 'give a genuine compliment to someone before you drink' },
+  { name: 'Stand up', text: 'stand up for the rest of this round' },
+  { name: 'Pirate', text: 'talk like a pirate until next roll' },
+  { name: 'Slow mo', text: 'do everything in slow motion until next roll' },
+  { name: 'Question', text: 'only speak in questions until next roll' },
+  { name: 'Name drop', text: 'NAME_DROP_PLACEHOLDER' }
+];
+
+
+const nameDropLines = [
+  "and I just fingered a bin chicken while it was still warm",
+  "and I once kissed a bin chicken on the cloaca",
+  "and my first kiss was with a bin chicken",
+  "and I proposed marriage to a bin chicken at the tip",
+  "and I got caught masturbating to bin chicken porn",
+  "and I named my vibrator after a bin chicken",
+  "and I once shagged a bin chicken behind the bins",
+  "and I have a bin chicken onlyfans",
+  "and I regularly make love to roadkill bin chickens",
+  "and I keep a stuffed bin chicken under my pillow",
+  "and I once got a bin chicken pregnant (allegedly)",
+  "and I licked a bin chicken's feet for $20",
+  "and I have a bin chicken tattoo on my inner thigh",
+  "and I sleep with a bin chicken plush every night",
+  "and I once fingered a bin chicken in front of my mum",
+  "and I got kicked out of the zoo for trying to date a bin chicken",
+  "and I have a secret bin chicken fetish",
+  "and I once used a bin chicken as a sex toy",
+  "and I wrote a love song about a bin chicken",
+  "and I got food poisoning from eating a raw bin chicken",
+  "and I once snogged a bin chicken at a party",
+  "and I once got arrested for public indecency with a bin chicken",
+  "and I keep bin chicken feathers in my underwear drawer",
+  "and I once did the motorboat on a live bin chicken",
+  "and I have a bin chicken altar in my bedroom",
+  "and I once got a bin chicken to peck my nipples",
+  "and I regularly dream about bin chickens sexually",
+  "and I once proposed to a bin chicken on one knee",
+  "and I have a collection of bin chicken erotica",
+  "and I once got caught by the cops with a bin chicken",
+  "and I named my firstborn after a bin chicken",
+  "and I once had a threesome with two bin chickens",
+  "and I regularly kiss bin chickens goodnight",
+  "and I once got a bin chicken to sit on my face",
+  "and I have a bin chicken wallpaper on my phone",
+  "and I once fingered a bin chicken in the shower",
+  "and I got a bin chicken to wear my underwear",
+  "and I once made out with a bin chicken for 10 minutes",
+  "and I once got a bin chicken to peck my balls",
+  "and I regularly roleplay as a bin chicken during sex",
+  "and I once got caught shagging a bin chicken by my boss",
+  "and I have a bin chicken cosplay outfit",
+  "and I once licked a bin chicken from head to toe",
+  "and I got a bin chicken to lay an egg on my chest",
+  "and I once had sex with a bin chicken in a car",
+  "and I have a bin chicken plush I call my girlfriend",
+  "and I once got a bin chicken to motorboat me",
+  "and I regularly text bin chickens sexy messages",
+  "and I once got arrested for stealing a bin chicken from the tip",
+  "and I have a bin chicken tattoo on my arse",
+  "and I once fingered a bin chicken while it was sleeping",
+  "and I got a bin chicken to sit on my dick",
+  "and I once made a bin chicken my ring bearer",
+  "and I once got a bin chicken to peck my arsehole",
+  "and I regularly watch bin chicken porn",
+  "and I once got caught by my parents with a bin chicken",
+  "and I have a bin chicken body pillow",
+  "and I once did anal with a bin chicken (don't ask)",
+  "and I got a bin chicken to wear a condom",
+  "and I once kissed a bin chicken in front of my crush",
+  "and I have a bin chicken shrine in my garage",
+  "and I once got a bin chicken to give me a lap dance",
+  "and I regularly dream about being a bin chicken",
+  "and I once got a bin chicken to peck my nipples raw",
+  "and I once fingered a bin chicken at the tip in broad daylight",
+  "and I got a bin chicken to sit on my face for 20 minutes",
+  "and I once had a romantic dinner with a bin chicken",
+  "and I have a bin chicken plush I take on dates",
+  "and I once got a bin chicken to motorboat my balls",
+  "and I regularly talk dirty to bin chickens",
+  "and I once got caught by security with a bin chicken in my pants",
+  "and I have a bin chicken tattoo across my chest",
+  "and I once licked a bin chicken's cloaca for science",
+  "and I got a bin chicken to lay an egg in my mouth",
+  "and I once had sex with a bin chicken on a trampoline",
+  "and I once got a bin chicken to peck my dick",
+  "and I regularly cosplay as a bin chicken for my partner",
+  "and I once got a bin chicken to wear lingerie",
+  "and I once fingered a bin chicken while it was eating",
+  "and I got a bin chicken to sit on my lap during a movie",
+  "and I once made out with a bin chicken in the rain",
+  "and I have a bin chicken altar with candles",
+  "and I once got a bin chicken to peck my arse",
+  "and I regularly write fanfiction about bin chickens",
+  "and I once got arrested for public sex with a bin chicken",
+  "and I once got a bin chicken to give me a blowjob (sort of)",
+  "and I got a bin chicken to wear my shirt",
+  "and I once had a bin chicken as my plus one to a wedding",
+  "and I have a bin chicken tattoo on my dick",
+  "and I once licked a bin chicken in front of my friends",
+  "and I got a bin chicken to sit on my face at a party",
+  "and I once had sex with a bin chicken in the back of a ute",
+  "and I have a bin chicken plush I named after my ex",
+  "and I once got a bin chicken to motorboat me in public",
+  "and I regularly send nudes to bin chickens",
+  "and I once got caught by the police with a bin chicken in my car",
+  "and I once fingered a bin chicken while it was still alive and kicking",
+  "and I got a bin chicken to peck my balls until I came",
+  "and I once made a bin chicken my valentine",
+  "and I have a bin chicken body pillow I hump",
+  "and I once got a bin chicken to sit on my dick in the shower",
+  "and I regularly roleplay bin chicken sex with my partner",
+  "and I once got a bin chicken to wear a thong",
+  "and I have a bin chicken tattoo of me and a bin chicken kissing",
+  "and I once licked a bin chicken's feet and then my own",
+  "and I got a bin chicken to lay an egg on my face",
+  "and I once had sex with a bin chicken at the tip",
+  "and I once got a bin chicken to peck my nipples while I jerked off",
+  "and I regularly dream about bin chickens fucking me",
+  "and I once got caught by my boss shagging a bin chicken",
+  "and I have a bin chicken plush I take to work",
+  "and I once fingered a bin chicken in front of my entire family",
+  "and I got a bin chicken to sit on my face for an hour",
+  "and I once had a threesome with a bin chicken and a friend",
+  "and I have a bin chicken shrine with photos",
+  "and I once got a bin chicken to motorboat my arse",
+  "and I regularly watch bin chicken sex videos",
+  "and I once got a bin chicken to wear my underwear to bed",
+  "and I once licked a bin chicken while it was pooping",
+  "and I got a bin chicken to peck my dick raw",
+  "and I once made out with a bin chicken for a dare",
+  "and I have a bin chicken tattoo on my lower back",
+  "and I once got a bin chicken to sit on my lap at dinner",
+  "and I regularly text my ex about bin chickens",
+  "and I once got arrested for animal cruelty with a bin chicken (it was consensual)",
+  "and I have a bin chicken plush I call my wife",
+  "and I once fingered a bin chicken in the middle of the street",
+  "and I got a bin chicken to give me a rimjob (sort of)",
+  "and I once had sex with a bin chicken on camera",
+  "and I once got a bin chicken to peck my arsehole while I came",
+  "and I regularly cosplay as a sexy bin chicken",
+  "and I once got a bin chicken to wear a bikini",
+  "and I have a bin chicken body pillow I spoon",
+  "and I once licked a bin chicken from cloaca to beak",
+  "and I got a bin chicken to lay an egg in my hand",
+  "and I once had sex with a bin chicken in my parents' bed",
+  "and I have a bin chicken tattoo of a bin chicken in lingerie",
+  "and I once got a bin chicken to motorboat me at the tip",
+  "and I regularly dream about marrying a bin chicken",
+  "and I once got caught by security cameras with a bin chicken",
+  "and I once fingered a bin chicken while it was eating chips",
+  "and I got a bin chicken to sit on my face at the pub",
+  "and I once made a bin chicken my best man",
+  "and I have a bin chicken plush I take on holidays",
+  "and I once got a bin chicken to peck my balls in public",
+  "and I regularly write poetry about bin chickens",
+  "and I once got a bin chicken to wear my socks",
+  "and I have a bin chicken shrine with candles and feathers",
+  "and I once licked a bin chicken's cloaca in front of my crush",
+  "and I got a bin chicken to sit on my dick at a party",
+  "and I once had sex with a bin chicken in the shower at the tip",
+  "and I once got a bin chicken to peck my nipples for 10 minutes",
+  "and I regularly roleplay as a bin chicken on onlyfans",
+  "and I once got a bin chicken to wear my hat",
+  "and I have a bin chicken tattoo on my shoulder",
+  "and I once fingered a bin chicken while it was dead",
+  "and I got a bin chicken to give me a lap dance at the tip",
+  "and I once made out with a bin chicken in the car",
+  "and I have a bin chicken plush I call my baby",
+  "and I once got a bin chicken to motorboat my balls at the pub",
+  "and I regularly send bin chicken nudes to strangers",
+  "and I once got arrested for having a bin chicken in my pants",
+  "and I once licked a bin chicken while it was still warm from the sun",
+  "and I got a bin chicken to peck my dick until it bled",
+  "and I once had a romantic picnic with a bin chicken",
+  "and I have a bin chicken body pillow I hump every night",
+  "and I once got a bin chicken to sit on my face while I jerked off",
+  "and I regularly dream about bin chickens pecking me",
+  "and I once got a bin chicken to wear my underwear on its head",
+  "and I have a bin chicken tattoo across my back",
+  "and I once fingered a bin chicken in front of the police",
+  "and I got a bin chicken to lay an egg on my dick",
+  "and I once had sex with a bin chicken in the middle of the tip",
+  "and I once got a bin chicken to peck my arse until I came",
+  "and I regularly cosplay as a bin chicken for my onlyfans",
+  "and I once got a bin chicken to wear a condom on its beak",
+  "and I once licked a bin chicken's feet and then kissed my partner",
+  "and I got a bin chicken to sit on my lap for an entire movie",
+  "and I once made a bin chicken my emergency contact",
+  "and I have a bin chicken shrine with photos of me and bin chickens",
+  "and I once got a bin chicken to motorboat me in the shower",
+  "and I regularly talk about bin chickens during sex",
+  "and I once got caught by my mum with a bin chicken in my bed",
+  "and I once fingered a bin chicken while it was pooping",
+  "and I got a bin chicken to peck my balls for a dare",
+  "and I once had sex with a bin chicken on the kitchen table",
+  "and I have a bin chicken tattoo of a bin chicken giving head",
+  "and I once got a bin chicken to sit on my face at family dinner",
+  "and I regularly dream about being fucked by a bin chicken",
+  "and I once got a bin chicken to wear my shirt to the tip",
+  "and I have a bin chicken plush I call my side chick",
+  "and I once licked a bin chicken in front of my entire footy team",
+  "and I got a bin chicken to give me a rimjob at the tip",
+  "and I once made out with a bin chicken for 30 minutes",
+  "and I once got a bin chicken to peck my nipples while I was driving",
+  "and I regularly write fanfiction about me and bin chickens",
+  "and I once got a bin chicken to sit on my dick in front of my friends",
+  "and I once fingered a bin chicken while it was eating a dead rat",
+  "and I got a bin chicken to lay an egg in my mouth at a party",
+  "and I once had sex with a bin chicken in the back of a truck",
+];
+
+let usedNameDrops = new Set();
+
+let players = [];
+let nonDrinkerIndex = -1;
+let currentIndex = 0;
+let playerAccents = {}; // index -> accent string, lasts until their next roll
+
+function getRandomAccent() {
+  return accents[Math.floor(Math.random() * accents.length)];
+}
+
+const setupScreen = document.getElementById('setupScreen');
+const gameScreen = document.getElementById('gameScreen');
+const playerListEl = document.getElementById('playerList');
+const newPlayerName = document.getElementById('newPlayerName');
+const addPlayerBtn = document.getElementById('addPlayerBtn');
+const nonDrinkerSelect = document.getElementById('nonDrinkerSelect');
+const startGameBtn = document.getElementById('startGameBtn');
+const backToSetup = document.getElementById('backToSetup');
+const currentPlayerName = document.getElementById('currentPlayerName');
+const die1 = document.getElementById('die1');
+const die2 = document.getElementById('die2');
+const totalEl = document.getElementById('total');
+const actionText = document.getElementById('actionText');
+const actionSub = document.getElementById('actionSub');
+const rollBtn = document.getElementById('rollBtn');
+const playerListGame = document.getElementById('playerListGame');
+const accentBanner = document.getElementById('accentBanner');
+
+function renderPlayerList() {
+  playerListEl.innerHTML = players.map((p, i) => `
+    <div class="flex items-center justify-between py-2 px-3 bg-neutral-50 rounded-xl">
+      <span class="font-medium">${p}</span>
+      <button onclick="removePlayer(${i})" class="text-neutral-400 text-sm">×</button>
+    </div>
+  `).join('');
+  
+  nonDrinkerSelect.innerHTML = '<option value="">None</option>' + 
+    players.map((p, i) => `<option value="${i}">${p}</option>`).join('');
+}
+
+function addPlayer() {
+  const input = document.getElementById('newPlayerName');
+  const name = (input ? input.value : '').trim();
+  if (!name) return;
+  players.push(name);
+  if (input) input.value = '';
+  renderPlayerList();
+}
+
+function removePlayer(i) {
+  players.splice(i, 1);
+  renderPlayerList();
+}
+window.removePlayer = removePlayer;
+
+function setupListeners() {
+  const addBtn = document.getElementById('addPlayerBtn');
+  const nameInput = document.getElementById('newPlayerName');
+  if (addBtn) addBtn.addEventListener('click', addPlayer);
+  if (nameInput) {
+    nameInput.addEventListener('keypress', e => { if (e.key === 'Enter') addPlayer(); });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupListeners);
+} else {
+  setupListeners();
+}
+
+startGameBtn.addEventListener('click', () => {
+  if (players.length < 2) {
+    alert('Add at least 2 players');
+    return;
+  }
+  nonDrinkerIndex = nonDrinkerSelect.value === '' ? -1 : parseInt(nonDrinkerSelect.value);
+  currentIndex = 0;
+  setupScreen.classList.remove('active');
+  gameScreen.classList.add('active');
+  updateGameUI();
+  renderDie(die1, 1);
+  renderDie(die2, 1);
+});
+
+backToSetup.addEventListener('click', () => {
+  gameScreen.classList.remove('active');
+  setupScreen.classList.add('active');
+});
+
+function renderDie(el, value) {
+  el.innerHTML = '<div class="dots"></div>';
+  const dots = el.querySelector('.dots');
+  for (let i = 0; i < 9; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    if (positions[value].includes(i)) d.classList.add('on');
+    dots.appendChild(d);
+  }
+}
+
+function getOutcome(a, b) {
+  const total = a + b;
+  const doubles = a === b;
+
+  // Chook motor boat ~10% (4 outcomes: double 5 + a few others)
+  if ((a === 5 && b === 5) || 
+      (a === 4 && b === 6) || 
+      (a === 6 && b === 4) || 
+      (a === 3 && b === 5) || 
+      (a === 5 && b === 3)) return 'chook';
+
+  // Total 7 = accent
+  if (total === 7) return 'accent';
+
+  // Other doubles = fun quest
+  if (doubles) return 'quest';
+
+  // Next person sips
+  if (['1-6','6-1','2-6','6-2','3-6','6-3','4-6'].includes(`${a}-${b}`)) return 'next';
+
+  // Safe
+  if (['1-2','2-1','1-3','3-1','2-3','3-2','1-4','4-1'].includes(`${a}-${b}`)) return 'safe';
+
+  // Everything else = sip
+  return 'sip';
+}
+
+function nextDrinker(fromIndex) {
+  let i = (fromIndex + 1) % players.length;
+  while (i !== fromIndex && i === nonDrinkerIndex) {
+    i = (i + 1) % players.length;
+  }
+  return i;
+}
+
+function getDisplay(outcome, rollerIndex) {
+  const roller = players[rollerIndex];
+  switch (outcome) {
+    case 'sip':
+      return { main: 'Sip', sub: `${roller} takes a sip`, color: 'text-amber-700', advance: true };
+    case 'safe':
+      return { main: 'Safe', sub: 'Pass the dice', color: 'text-neutral-500', advance: true };
+    case 'next': {
+      const target = nextDrinker(rollerIndex);
+      const targetName = players[target];
+      return { main: 'Next person', sub: `${targetName} sips`, color: 'text-orange-600', advance: true };
+    }
+    case 'accent': {
+      const accent = accents[Math.floor(Math.random() * accents.length)];
+      playerAccents[rollerIndex] = accent;
+      return { main: 'Accent!', sub: `${roller} speaks in a ${accent} accent until next roll`, color: 'text-purple-700', advance: true };
+    }
+    case 'chook':
+      return { main: 'CHOOK', sub: `${roller} does the chook motor boat!`, color: 'text-pink-600', advance: true };
+    case 'quest': {
+      const quest = funQuests[Math.floor(Math.random() * funQuests.length)];
+      let sub = quest.text;
+      if (quest.name === 'Name drop') {
+        if (usedNameDrops.size >= nameDropLines.length) usedNameDrops.clear();
+        let idx;
+        do { idx = Math.floor(Math.random() * nameDropLines.length); } while (usedNameDrops.has(idx));
+        usedNameDrops.add(idx);
+        const line = nameDropLines[idx];
+        sub = `say “My name is ${roller}, ${line}”`;
+      }
+      return { main: quest.name, sub: `${roller} must ${sub}`, color: 'text-teal-600', advance: true };
+    }
+    default:
+      return { main: 'Sip', sub: `${roller} takes a sip`, color: 'text-amber-700', advance: true };
+  }
+}
+
+function updateGameUI() {
+  const name = players[currentIndex] || '—';
+  if (currentPlayerName) currentPlayerName.textContent = name;
+  
+  // Show active accent if this player has one
+  if (accentBanner) {
+    if (playerAccents[currentIndex]) {
+      accentBanner.textContent = `Speaking in a ${playerAccents[currentIndex]} accent`;
+      accentBanner.classList.remove('hidden');
+    } else {
+      accentBanner.classList.add('hidden');
+    }
+  }
+  // Just rotates the current name — no scrolling list
+}
+
+function roll() {
+  if (rollBtn.disabled) return;
+  rollBtn.disabled = true;
+  actionText.textContent = 'Rolling…';
+  actionText.className = 'text-3xl font-bold text-neutral-300';
+  actionSub.textContent = '';
+
+  die1.classList.add('rolling');
+  die2.classList.add('rolling');
+
+  let f = 0;
+  const flicker = setInterval(() => {
+    renderDie(die1, Math.floor(Math.random()*6)+1);
+    renderDie(die2, Math.floor(Math.random()*6)+1);
+    if (++f > 5) clearInterval(flicker);
+  }, 55);
+
+  setTimeout(() => {
+    clearInterval(flicker);
+    const v1 = Math.floor(Math.random()*6)+1;
+    const v2 = Math.floor(Math.random()*6)+1;
+
+    die1.classList.remove('rolling');
+    die2.classList.remove('rolling');
+    renderDie(die1, v1);
+    renderDie(die2, v2);
+
+    const total = v1 + v2;
+    totalEl.textContent = total;
+
+    // Clear accent on their next roll (it lasts until this roll)
+    if (playerAccents[currentIndex]) {
+      delete playerAccents[currentIndex];
+    }
+
+    const outcome = getOutcome(v1, v2);
+    const display = getDisplay(outcome, currentIndex);
+
+    actionText.textContent = display.main;
+    actionText.className = `text-3xl font-bold ${display.color} action-pop`;
+    actionSub.textContent = display.sub;
+
+    if (display.advance) {
+      currentIndex = (currentIndex + 1) % players.length;
+      // skip non-drinker if they would be next and the effect was on them? keep simple
+      if (players[currentIndex] && currentIndex === nonDrinkerIndex) {
+        currentIndex = (currentIndex + 1) % players.length;
+      }
+    }
+
+    setTimeout(() => updateGameUI(), 600);
+    rollBtn.disabled = false;
+  }, 480);
+}
+
+if (rollBtn) rollBtn.addEventListener('click', roll);
+
+// Shake
+let last = 0;
+window.addEventListener('devicemotion', e => {
+  const a = e.accelerationIncludingGravity;
+  if (!a) return;
+  const mag = Math.abs(a.x)+Math.abs(a.y)+Math.abs(a.z);
+  if (mag > 30 && Date.now()-last > 1200 && !rollBtn.disabled && gameScreen.classList.contains('active')) {
+    last = Date.now();
+    roll();
+  }
+});
+
+// Default players for quick start
+players = ['Player 1','Player 2','Player 3','Player 4','Player 5','Player 6','Player 7','Player 8','Player 9','Player 10'];
+renderPlayerList();
+
+// Prevent double-tap zoom and other web gestures
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+let lastTouch = 0;
+document.addEventListener('touchend', e => {
+  const now = Date.now();
+  if (now - lastTouch <= 300) e.preventDefault();
+  lastTouch = now;
+}, { passive: false });
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
